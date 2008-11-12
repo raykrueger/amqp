@@ -73,10 +73,6 @@ module AMQP
     def connection_completed
       log 'connected'
       @connected = true
-      @on_disconnect = proc{ 
-        @connected = false
-        log 'Disconnected from server'
-      }
       @buf = Buffer.new
       send_data HEADER
       send_data [1, 1, VERSION_MAJOR, VERSION_MINOR].pack('C4')

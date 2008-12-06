@@ -63,7 +63,10 @@ module AMQP
       @settings = opts
       extend AMQP.client
 
-      @on_disconnect = proc{ raise Error, "Could not connect to server #{opts[:host]}:#{opts[:port]}" }
+      @on_disconnect = proc do
+        @connected = false
+        log "Could not connect to server #{opts[:host]}:#{opts[:port]}" 
+      end
 
       timeout @settings[:timeout] if @settings[:timeout]
       errback do
@@ -78,12 +81,16 @@ module AMQP
 
     def connection_completed
       log 'connected'
+      @connected = true
 
       if @settings.key?(:reconnect)
         @settings[:reconnect].call self
         @on_disconnect = nil
       else
-        @on_disconnect = proc{ raise Error, 'Disconnected from server' }
+        @on_disconnect = proc do
+          @connected = false
+          log 'Disconnected from server'
+        end
       end
 
       @buf = Buffer.new
@@ -93,6 +100,8 @@ module AMQP
 
     def unbind
       log 'disconnected'
+      @connected = false
+
       EM.next_tick do
         if @settings.key?(:reconnect)
           sleep(5)
@@ -159,6 +168,10 @@ module AMQP
                                                :method_id => 0)
         end
       }
+    end
+  
+    def connected?
+      @connected
     end
   
     def self.connect opts = {}, &blk

@@ -57,6 +57,8 @@ module AMQP
   module Client
     include EM::Deferrable
 
+    attr_accessor :reconnect
+
     def initialize opts = {}
       @settings = opts
       extend AMQP.client
@@ -64,12 +66,26 @@ module AMQP
       @on_disconnect = proc{ raise Error, "Could not connect to server #{opts[:host]}:#{opts[:port]}" }
 
       timeout @settings[:timeout] if @settings[:timeout]
-      errback{ @on_disconnect.call }
+      errback do
+        if @settings.key?(:reconnect)
+          sleep(5)
+          Client.connect @settings, &(@settings[:reconnect])
+        else
+          @on_disconnect.call
+        end
+      end
     end
 
     def connection_completed
       log 'connected'
-      @on_disconnect = proc{ raise Error, 'Disconnected from server' }
+
+      if @settings.key?(:reconnect)
+        @settings[:reconnect].call self
+        @on_disconnect = nil
+      else
+        @on_disconnect = proc{ raise Error, 'Disconnected from server' }
+      end
+
       @buf = Buffer.new
       send_data HEADER
       send_data [1, 1, VERSION_MAJOR, VERSION_MINOR].pack('C4')
@@ -77,7 +93,14 @@ module AMQP
 
     def unbind
       log 'disconnected'
-      EM.next_tick{ @on_disconnect.call }
+      EM.next_tick do
+        if @settings.key?(:reconnect)
+          sleep(5)
+          Client.connect @settings, &(@settings[:reconnect])
+        else
+          @on_disconnect.call
+        end
+      end
     end
 
     def add_channel mq
@@ -122,6 +145,7 @@ module AMQP
 
     def close &on_disconnect
       @on_disconnect = on_disconnect if on_disconnect
+      @settings.delete(:reconnect)
 
       callback{ |c|
         if c.channels.any?
@@ -137,8 +161,10 @@ module AMQP
       }
     end
   
-    def self.connect opts = {}
+    def self.connect opts = {}, &blk
       opts = AMQP.settings.merge(opts)
+      opts[:reconnect] = blk if block_given?
+
       EM.connect opts[:host], opts[:port], self, opts
     end
   

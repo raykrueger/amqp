@@ -70,9 +70,9 @@ module AMQP
 
       timeout @settings[:timeout] if @settings[:timeout]
       errback do
+        @connected = false
         if @settings.key?(:reconnect)
-          sleep(5)
-          Client.connect @settings, &(@settings[:reconnect])
+          EM.add_timer(5) { Client.connect @settings, &(@settings[:reconnect]) }
         else
           @on_disconnect.call
         end
@@ -104,8 +104,7 @@ module AMQP
 
       EM.next_tick do
         if @settings.key?(:reconnect)
-          sleep(5)
-          Client.connect @settings, &(@settings[:reconnect])
+          EM.add_timer(5) { Client.connect @settings, &(@settings[:reconnect]) }
         else
           @on_disconnect.call
         end

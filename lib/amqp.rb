@@ -18,8 +18,8 @@ module AMQP
     alias :connection :conn
   end
 
-  def self.connect *args
-    Client.connect *args
+  def self.connect *args, &blk
+    Client.connect *args, &blk
   end
 
   def self.settings

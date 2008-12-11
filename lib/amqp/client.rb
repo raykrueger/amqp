@@ -36,7 +36,8 @@ module AMQP
           succeed(self)
 
         when Protocol::Connection::Close
-          raise Error, "#{method.reply_text} in #{Protocol.classes[method.class_id].methods[method.method_id]}"
+          @connected = false
+          log "#{method.reply_text} in #{Protocol.classes[method.class_id].methods[method.method_id]}"
 
         when Protocol::Connection::CloseOk
           @on_disconnect.call if @on_disconnect

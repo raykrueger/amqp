@@ -1,4 +1,4 @@
-class MQ
+class BaseMQ
   class RPC < BlankSlate
     def initialize mq, queue, obj = nil
       @mq = mq

@@ -1,4 +1,4 @@
-class MQ
+class BaseMQ
   class Logger
     def initialize *args, &block
       opts = args.pop if args.last.is_a? Hash

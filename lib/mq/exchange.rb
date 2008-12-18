@@ -1,4 +1,4 @@
-class MQ
+class BaseMQ
   class Exchange
     include AMQP
 

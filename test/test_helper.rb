@@ -2,7 +2,6 @@ require 'test/unit'
 
 require 'rubygems'
 
-gem 'amqp'
 require 'mq'
 
 gem 'activesupport'
@@ -25,7 +24,7 @@ class Test::Unit::TestCase
 
             EM.add_timer(options[:timeout] || 5) do
               # In case the test never completes, time it out.
-              AMQP.stop { EM.stop }
+              EM.stop
               @timed_out = true
             end
 

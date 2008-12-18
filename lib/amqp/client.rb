@@ -4,6 +4,17 @@ module AMQP
   class Error < StandardError; end
 
   module BasicClient
+    def channels
+      @channels ||= {}
+    end
+
+    def add_channel mq
+      (@_channel_mutex ||= Mutex.new).synchronize do
+        channels[ key = (channels.keys.max || 0) + 1 ] = mq
+        key
+      end
+    end
+  
     def process_frame frame
       if mq = channels[frame.channel]
         mq.process_frame(frame)
@@ -33,17 +44,45 @@ module AMQP
                                               :insist => @settings[:insist])
 
         when Protocol::Connection::OpenOk
-          succeed(self)
+          @connection_ready = true
+          connection_did_become_ready if respond_to?(:connection_did_become_ready)
 
         when Protocol::Connection::Close
           @connected = false
           log "#{method.reply_text} in #{Protocol.classes[method.class_id].methods[method.method_id]}"
 
         when Protocol::Connection::CloseOk
+          @connection_ready = false
           @on_disconnect.call if @on_disconnect
         end
       end
     end
+
+    def connected?
+      @connected
+    end
+  
+    # True if the AMQP protocl connection is established
+    def connection_ready?
+      @connection_ready
+    end
+
+    def send data, opts = {}
+      channel = opts[:channel] ||= 0
+      data = data.to_frame(channel) unless data.is_a? Frame
+      data.channel = channel
+
+      log 'send', data
+      send_data data.to_s
+    end
+
+    private
+      def log *args
+        return unless @settings[:logging] or AMQP.logging
+        require 'pp'
+        pp args
+        puts
+      end
   end
 
   def self.client
@@ -112,17 +151,10 @@ module AMQP
       end
     end
 
-    def add_channel mq
-      (@_channel_mutex ||= Mutex.new).synchronize do
-        channels[ key = (channels.keys.max || 0) + 1 ] = mq
-        key
-      end
+    def connection_did_become_ready
+      succeed(self)
     end
 
-    def channels
-      @channels ||= {}
-    end
-  
     def receive_data data
       # log 'receive_data', data
       @buf << data
@@ -170,10 +202,6 @@ module AMQP
       }
     end
   
-    def connected?
-      @connected
-    end
-  
     def self.connect opts = {}, &blk
       opts = AMQP.settings.merge(opts)
       opts[:reconnect] = blk if block_given?
@@ -181,13 +209,5 @@ module AMQP
       EM.connect opts[:host], opts[:port], self, opts
     end
   
-    private
-  
-    def log *args
-      return unless @settings[:logging] or AMQP.logging
-      require 'pp'
-      pp args
-      puts
-    end
   end
 end

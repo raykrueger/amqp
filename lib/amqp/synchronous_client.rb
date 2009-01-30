@@ -2,8 +2,8 @@ module AMQP
   class SynchronousClient
     include AMQP::BasicClient
 
-    def initialize
-      @settings = AMQP.settings
+    def initialize(opts = {})
+      @settings = AMQP.settings.merge(opts)
       @buf = Buffer.new
       connect
     end
@@ -36,7 +36,7 @@ module AMQP
 
     private
       def socket
-        @socket ||= TCPSocket.open(AMQP.settings[:host], AMQP.settings[:port])
+        @socket ||= TCPSocket.open(@settings[:host], @settings[:port])
       end
 
       def send_data(data)

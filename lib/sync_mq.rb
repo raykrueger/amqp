@@ -1,6 +1,10 @@
 require 'mq'
 
 class SyncMQ < MQ
+  Dir[File.expand_path(File.join(File.dirname(__FILE__), 'sync_mq', '*.rb'))].each do |file|
+    require file
+  end
+
   @@thread = nil
 
   class << self
@@ -17,9 +21,17 @@ class SyncMQ < MQ
     spin_until(true) { self.connected }
   end
 
+  def rpc(name, obj = nil)
+    blocking_rpcs[name] ||= RPC.new(self, name, obj)
+  end
+
   def close
     super
     spin_until(false) { self.connected }
+  end
+
+  def blocking_rpcs
+    @blocking_rpcs ||= {}
   end
 
   private

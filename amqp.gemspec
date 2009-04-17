@@ -1,6 +1,6 @@
 spec = Gem::Specification.new do |s|
-  s.name = 'amqp'
-  s.version = '0.6.0'
+  s.name = 'dougbarth-sync_mq-amqp'
+  s.version = '0.7.0'
   s.date = '2009-01-09'
   s.summary = 'AMQP client implementation in Ruby/EventMachine'
   s.email = "amqp@tmm1.net"
@@ -39,6 +39,7 @@ spec = Gem::Specification.new do |s|
              "lib/mq/queue.rb",
              "lib/mq/rpc.rb",
              "lib/mq.rb",
+             "lib/sync_mq.rb",
              "protocol/amqp-0.8.json",
              "protocol/codegen.rb",
              "protocol/doc.txt",

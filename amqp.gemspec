@@ -43,6 +43,7 @@ spec = Gem::Specification.new do |s|
              "lib/mq/rpc.rb",
              "lib/mq.rb",
              "lib/sync_mq.rb",
+             "lib/sync_mq/rpc.rb",
              "protocol/amqp-0.8.json",
              "protocol/codegen.rb",
              "protocol/doc.txt",

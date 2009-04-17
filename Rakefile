@@ -15,7 +15,7 @@ end
 namespace :gem do
   desc 'Creates the gem and installs it locally'
   task :install => :gem do
-    sh 'gem install amqp-*.gem'
+    sh 'gem install dougbarth-sync_mq-amqp-*.gem'
   end
 end
 

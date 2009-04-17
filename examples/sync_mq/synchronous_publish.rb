@@ -1,7 +1,8 @@
-gem 'amqp', '0.7.0'
+$:.unshift File.dirname(__FILE__) + '/../../lib'
 require 'sync_mq'
 
-SyncMQ.ensure_reactor_running
+# Must call first to interact with the raw AMQP layer
+SyncMQ.start_reactor
 
 AMQP.logging = true
 

@@ -147,6 +147,8 @@ class MQ
   end
   attr_reader :channel
   
+  attr_reader :connected
+  
   # May raise a MQ::Error exception when the frame payload contains a
   # Protocol::Channel::Close object. 
   #
@@ -189,8 +191,9 @@ class MQ
                                             :method_id => 0,
                                             :class_id => 0)
         } if @closing
+        @connected = true
         succeed
-
+        
       when Protocol::Basic::CancelOk
         if @consumer = consumers[ method.consumer_tag ]
           @consumer.cancelled
@@ -227,6 +230,7 @@ class MQ
           c.channels.delete @channel
           c.close if c.channels.empty?
         }
+        @connected = false
       end
     end
   end

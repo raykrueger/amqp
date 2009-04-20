@@ -6,6 +6,7 @@ class SyncMQ < MQ
   end
 
   @@thread = nil
+  SPIN_TIMEOUT = 5
 
   class << self
     def start_reactor
@@ -18,7 +19,7 @@ class SyncMQ < MQ
   def initialize(connection = nil)
     self.class.start_reactor
     super(connection)
-    spin_until(true) { self.connected }
+    spin("waiting to establish a connection") { self.connected }
   end
 
   def rpc(name, obj = nil)
@@ -27,7 +28,7 @@ class SyncMQ < MQ
 
   def close
     super
-    spin_until(false) { self.connected }
+    spin("waiting to close the connection") { !self.connected }
   end
 
   def blocking_rpcs
@@ -35,9 +36,11 @@ class SyncMQ < MQ
   end
 
   private
-    def spin_until(desired)
-      until yield() == desired
+    def spin(description)
+      start_time = Time.now.to_f
+      until yield() == true
         sleep(0.1)
+        raise "SyncMQ::Timed out: #{description}" if Time.now.to_f - start_time > SPIN_TIMEOUT
       end 
     end
 end

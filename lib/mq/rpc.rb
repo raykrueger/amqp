@@ -54,23 +54,24 @@ class MQ
                  obj
                end
         
-        @mq.queue(queue).subscribe{ |info, request|
+        @mq.queue(queue, :auto_delete => true).subscribe{ |info, request|
           method, *args = ::Marshal.load(request)
           ret = @obj.__send__(method, *args)
 
           if info.reply_to
-            @mq.queue(info.reply_to).publish(::Marshal.dump(ret), :key => info.reply_to, :message_id => info.message_id)
+            @mq.queue(info.reply_to, :passive => true).publish(::Marshal.dump(ret), :key => info.reply_to, :message_id => info.message_id)
           end
         }
       else
         @callbacks ||= {}
         # XXX implement and use queue(nil)
-        @queue = @mq.queue(@name = "random identifier #{::Kernel.rand(999_999_999_999)}").subscribe{|info, msg|
+        @name = "random identifier #{::Kernel.rand(999_999_999_999)}"
+        @queue = @mq.queue(@name, :auto_delete => true).subscribe{|info, msg|
           if blk = @callbacks.delete(info.message_id)
             blk.call ::Marshal.load(msg)
           end
         }
-        @remote = @mq.queue(queue)
+        @remote = @mq.queue(queue, :passive => true)
       end
     end
 

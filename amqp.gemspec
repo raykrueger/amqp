@@ -1,5 +1,5 @@
 spec = Gem::Specification.new do |s|
-  s.name = 'amqp'
+  s.name = 'dougbarth-sync_mq-amqp'
   s.version = '0.5.9'
   s.date = '2008-09-01'
   s.summary = 'AMQP client implementation in Ruby/EventMachine'

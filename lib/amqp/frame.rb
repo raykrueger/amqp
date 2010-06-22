@@ -1,9 +1,9 @@
-require 'amqp/spec'
-require 'amqp/buffer'
-require 'amqp/protocol'
+require File.expand_path('../spec', __FILE__)
+require File.expand_path('../buffer', __FILE__)
+require File.expand_path('../protocol', __FILE__)
 
 module AMQP
-  class Frame
+  class Frame #:nodoc: all
     def initialize payload = nil, channel = 0
       @channel, @payload = channel, payload
     end

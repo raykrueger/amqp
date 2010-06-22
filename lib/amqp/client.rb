@@ -1,4 +1,4 @@
-require 'amqp/frame'
+require File.expand_path('../frame', __FILE__)
 
 module AMQP
   class Error < StandardError; end
@@ -9,7 +9,7 @@ module AMQP
         mq.process_frame(frame)
         return
       end
-      
+
       case frame
       when Frame::Method
         case method = frame.payload
@@ -49,7 +49,7 @@ module AMQP
   def self.client
     @client ||= BasicClient
   end
-  
+
   def self.client= mod
     mod.__send__ :include, AMQP
     @client = mod
@@ -64,52 +64,39 @@ module AMQP
       @settings = opts
       extend AMQP.client
 
-      @on_disconnect = proc do
-        @connected = false
-        log "Could not connect to server #{opts[:host]}:#{opts[:port]}" 
-      end
+      @on_disconnect ||= proc{ raise Error, "Could not connect to server #{opts[:host]}:#{opts[:port]}" }
 
       timeout @settings[:timeout] if @settings[:timeout]
-      errback do
-        @connected = false
-        if @settings.key?(:reconnect)
-          EM.add_timer(5) { Client.connect @settings, &(@settings[:reconnect]) }
-        else
-          @on_disconnect.call
-        end
-      end
+      errback{ @on_disconnect.call } unless @reconnecting
+
+      @connected = false
     end
 
     def connection_completed
+      start_tls if @settings[:ssl]
       log 'connected'
-      @connected = true
-
-      if @settings.key?(:reconnect)
-        @settings[:reconnect].call self
-        @on_disconnect = nil
-      else
-        @on_disconnect = proc do
-          @connected = false
-          log 'Disconnected from server'
-        end
+      # @on_disconnect = proc{ raise Error, 'Disconnected from server' }
+      unless @closing
+        @on_disconnect = method(:disconnected)
+        @reconnecting = false
       end
+
+      @connected = true
+      @connection_status.call(:connected) if @connection_status
 
       @buf = Buffer.new
       send_data HEADER
       send_data [1, 1, VERSION_MAJOR, VERSION_MINOR].pack('C4')
     end
 
+    def connected?
+      @connected
+    end
+
     def unbind
       log 'disconnected'
       @connected = false
-
-      EM.next_tick do
-        if @settings.key?(:reconnect)
-          EM.add_timer(5) { Client.connect @settings, &(@settings[:reconnect]) }
-        else
-          @on_disconnect.call
-        end
-      end
+      EM.next_tick{ @on_disconnect.call }
     end
 
     def add_channel mq
@@ -122,7 +109,7 @@ module AMQP
     def channels
       @channels ||= {}
     end
-  
+
     def receive_data data
       # log 'receive_data', data
       @buf << data
@@ -137,7 +124,7 @@ module AMQP
       # this is a stub meant to be
       # replaced by the module passed into initialize
     end
-  
+
     def send data, opts = {}
       channel = opts[:channel] ||= 0
       data = data.to_frame(channel) unless data.is_a? Frame
@@ -147,14 +134,21 @@ module AMQP
       send_data data.to_s
     end
 
+    #:stopdoc:
     # def send_data data
     #   log 'send_data', data
     #   super
     # end
+    #:startdoc:
 
     def close &on_disconnect
-      @on_disconnect = on_disconnect if on_disconnect
-      @settings.delete(:reconnect)
+      if on_disconnect
+        @closing = true
+        @on_disconnect = proc{
+          on_disconnect.call
+          @closing = false
+        }
+      end
 
       callback{ |c|
         if c.channels.any?
@@ -169,20 +163,47 @@ module AMQP
         end
       }
     end
-  
-    def connected?
-      @connected
+
+    def reconnect force = false
+      if @reconnecting and not force
+        # wait 1 second after first reconnect attempt, in between each subsequent attempt
+        EM.add_timer(1){ reconnect(true) }
+        return
+      end
+
+      unless @reconnecting
+        @reconnecting = true
+
+        @deferred_status = nil
+        initialize(@settings)
+
+        mqs = @channels
+        @channels = {}
+        mqs.each{ |_,mq| mq.reset } if mqs
+      end
+
+      log 'reconnecting'
+      EM.reconnect @settings[:host], @settings[:port], self
     end
-  
-    def self.connect opts = {}, &blk
+
+    def self.connect opts = {}
       opts = AMQP.settings.merge(opts)
       opts[:reconnect] = blk if block_given?
 
       EM.connect opts[:host], opts[:port], self, opts
     end
-  
+
+    def connection_status &blk
+      @connection_status = blk
+    end
+
     private
-  
+
+    def disconnected
+      @connection_status.call(:disconnected) if @connection_status
+      reconnect
+    end
+
     def log *args
       return unless @settings[:logging] or AMQP.logging
       require 'pp'
